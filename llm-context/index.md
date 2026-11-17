@@ -1,6 +1,6 @@
 ---
 type: index
-updated: 2026-11-15
+updated: 2026-11-17
 ---
 
 # LLM context
@@ -18,6 +18,8 @@ Knowledge written for agents to apply.
 
 ## Pages
 
+- `python-style/`: a skill folder for writing good Python. Copy the whole folder into
+  `.claude/skills/`. Holds the style guidelines, layout rules and the lint scripts.
 - [[writing-skills]]: writing good, token-efficient skills.
 
 ## Writing styles
