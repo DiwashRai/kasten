@@ -6,7 +6,8 @@ that never fails). Needs `uv` and `just`.
 1. Copy this skill's `scripts/layout.py` and `scripts/health.py` into the project's `scripts/`.
 2. Set `PACKAGE` near the top of `scripts/layout.py` to the package name under `src/`.
 3. Add the configuration below, then run `uv sync` and `uv run pre-commit install`.
-4. Run `just check` and `just health`; both must run before any code is written.
+4. Before any code is written, `just check` must pass and `just health` must run. `just test` fails
+   until the first test exists.
 
 ## `pyproject.toml`
 

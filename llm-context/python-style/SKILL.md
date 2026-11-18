@@ -53,12 +53,13 @@ when a feature is done. `just check` must pass before every commit.**
 
 **Check code quality as you go, not just at the end.** Run `uv run complexipy src` each time you
 finish a function or a piece of a feature, and look for anything that stands out: a function far
-more complex, more nested, or longer than the rest. Run `uv run just health` when a feature is done
-and look the same way at long files, modules whose functions fall into unrelated groups, modules
-that import many others, and heavy commenting. Simplify those while the code is fresh, keeping the
-tests passing. Don't hill-climb the numbers: the metric points at code worth a second look, and it
-isn't a score to lower. Splitting a function or moving logic around just to shrink a metric makes
-the code worse. `uv run complexipy --help` lists the options.
+more complex, more nested, or longer than the rest. A complex function in an impure file is a
+decision in the wrong place. Run `uv run just health` when a feature is done and look the same way
+at long files, modules whose functions fall into unrelated groups, modules that import many others,
+and heavy commenting. Simplify those while the code is fresh, keeping the tests passing. Don't
+hill-climb the numbers: the metric points at code worth a second look, and it isn't a score to
+lower. Splitting a function or moving logic around just to shrink a metric makes the code worse.
+`uv run complexipy --help` lists the options.
 
 ## Style guidelines
 

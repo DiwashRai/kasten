@@ -3,16 +3,17 @@
 Read before creating, moving or splitting a file. In an existing project, follow its layout.
 
 - **Pure by default.** A file is pure unless its path matches `impure` under `[tool.layout]` in
-  `pyproject.toml` (default `["*_io.py"]`). Pure means no I/O, environment, clock, randomness, `Any`
+  `pyproject.toml` (usually `["*_io.py"]`). Pure means no I/O, environment, clock, randomness, `Any`
   or untyped dicts, and imports only of pure files. Pass values such as today's date in.
 - **Calling a client is I/O**, even when the client is passed in or typed as a `Protocol`.
 - **Impure files are thin.** One talks to a system (`confluence_io.py`) or runs a subject's steps
-  (`page_write_io.py`). Decisions are pure functions it calls.
+  (`page_write_io.py`). It carries out what pure functions decide and never chooses what happens
+  next.
 - **One file per subject**, named as a change request would name it (`search.py`, `page_write.py`),
   with its types and functions together. Never split by kind: `model`, `rules`, `utils`, `inputs`,
   `results`.
-- **Start flat.** A few lines do not earn a file. A subject becomes a folder only when it outgrows a
-  file. Split a large file into two subjects, never into types and functions.
+- **Start flat.** A few lines do not earn a file. A subject gets a folder once it spans several
+  files. Split a large file into two subjects, never into types and functions.
 - **A likely change should touch one or two files.** More means a subject is spread across stages.
 - **Folder imports are declared** in `[tool.layout.imports]` (`orders = ["payments"]`), with no
   cycles.
