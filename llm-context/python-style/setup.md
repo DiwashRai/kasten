@@ -30,6 +30,12 @@ typeCheckingMode = "standard"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
+# Every file under `src/<package>` is checked as pure unless its path, relative to the package,
+# matches one of these patterns. `*` also matches across folders: "*_io.py" covers every folder,
+# "server.py" only the top level, "jobs/worker.py" one file. Edit the list to suit the project.
+[tool.layout]
+impure = ["*_io.py"]
+
 # Feature `a` may import feature `b` only when listed here: `a = ["b"]`. Checked by
 # `scripts/layout.py`; the declared imports must not form a cycle.
 [tool.layout.imports]

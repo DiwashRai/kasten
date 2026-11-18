@@ -31,15 +31,9 @@ error fields.
 
 ## Layout
 
-- One folder per feature or service under `src/<package>`. A new kind of thing gets its own folder.
-  Top-level modules are few and shared by every feature.
-- A file named `rules.py` or `model.py` is pure: no I/O, environment, clock or randomness, no `Any`
-  or untyped dicts, and it imports only other `rules.py` and `model.py` files. Decisions live in
-  `rules.py`; values such as today's date are read by the caller and passed in.
-- A feature imports another feature only when `[tool.layout.imports]` in `pyproject.toml` says so
-  (`jobs = ["todoist"]`), and those imports never form a cycle.
-
-In an existing project that is laid out differently, follow its layout.
+**ALWAYS read [layout.md](layout.md) before creating, moving or splitting a file.** It says where
+code goes and what each file may do. In short: every file is pure (no I/O, environment, clock or
+randomness) unless `pyproject.toml` lists it as impure, and impure files stay thin.
 
 ## Workflow
 

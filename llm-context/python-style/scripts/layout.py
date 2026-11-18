@@ -1,7 +1,9 @@
 """The layout rules for `src/personal_mcp`, checked with the standard library only.
 
-- `rules.py` and `model.py` files are pure: no I/O, environment, clock or randomness, no `Any`
-  or untyped dicts, and project imports only of other `rules.py` and `model.py` files.
+- Every file is pure unless its path relative to `src/personal_mcp` matches a pattern in
+  `impure` under `[tool.layout]` in `pyproject.toml` (fnmatch, so `*` also crosses folders).
+  A pure file has no I/O, environment, clock or randomness, no `Any` or untyped dicts, and
+  project imports only of other pure files.
 - Each folder directly under `src/personal_mcp` is a feature. A feature imports another only
   when `[tool.layout.imports]` in `pyproject.toml` declares it, and the declarations are acyclic.
 
@@ -9,6 +11,7 @@ Each failure prints `file:line  what was found  how to fix it`. Exits 1 on any f
 """
 
 import ast
+import fnmatch
 import sys
 import tomllib
 from dataclasses import dataclass
@@ -17,12 +20,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 PACKAGE = "personal_mcp"
 SRC = ROOT / "src" / PACKAGE
-PURE_NAMES = {"rules.py", "model.py"}
+IMPURE_HINT = "if the file's job is I/O, name it to match a pattern in impure under [tool.layout]"
 
 IO_MODULES = {
     "httpx", "requests", "aiohttp", "urllib", "urllib3", "fastmcp", "mcp", "sqlite3",
     "subprocess", "socket",
 }  # fmt: skip
+PURE_SUBMODULES = ("urllib.parse",)  # string handling inside an I/O package
 RANDOM_MODULES = {"random", "secrets"}
 IO_CALLS = {"open", "print", "input", "breakpoint"}
 PATH_IO_METHODS = {
@@ -47,9 +51,9 @@ class Source:
     def file(self) -> str:
         return self.path.relative_to(ROOT).as_posix()
 
-    @property
-    def pure(self) -> bool:
-        return self.path.name in PURE_NAMES
+    def pure(self, impure: list[str]) -> bool:
+        within = self.path.relative_to(SRC).as_posix()
+        return not any(fnmatch.fnmatchcase(within, pattern) for pattern in impure)
 
 
 def module_name(path: Path) -> str:
@@ -107,7 +111,7 @@ def ends_with(name: str, suffixes: tuple[str, ...]) -> bool:
 def impure_import(module: str, name: str | None) -> tuple[str, str] | None:
     full = f"{module}.{name}" if name else module
     top = module.split(".")[0]
-    if top in IO_MODULES:
+    if top in IO_MODULES and not any(f"{full}.".startswith(f"{m}.") for m in PURE_SUBMODULES):
         return f"import of {full}", "do the I/O in the caller and pass the data in"
     if top in RANDOM_MODULES:
         return f"import of {full}", "draw the random value in the caller and pass it in"
@@ -194,38 +198,55 @@ def annotations(tree: ast.Module) -> list[tuple[int, str, ast.expr | None]]:
 
 
 def purity_failures(source: Source, pure_modules: set[str], modules: set[str]) -> list[str]:
-    name = source.path.name
     out: list[str] = []
     for node in ast.walk(source.tree):
         found = impurity(node)
         if found:
             what, fix = found
-            out.append(f"{source.file}:{getattr(node, 'lineno', 1)}  {what}  {name} is pure: {fix}")
+            line = getattr(node, "lineno", 1)
+            out.append(f"{source.file}:{line}  {what}  the file is pure: {fix}; {IMPURE_HINT}")
     for line, where, annotation in annotations(source.tree):
         kind = untyped(annotation)
         if kind and annotation:
             out.append(
                 f"{source.file}:{line}  {where} is {ast.unparse(annotation)} ({kind})  "
-                f"{name} is pure and takes typed data: "
+                "the file is pure and takes typed data: "
                 "give the data a dataclass with named, typed fields and parse raw input into it "
-                "in the caller"
+                f"in the caller; {IMPURE_HINT}"
             )
     for line, imported in project_imports(source, modules):
         if imported not in pure_modules:
             out.append(
-                f"{source.file}:{line}  import of {imported}  {name} is pure and imports only "
-                "rules.py and model.py files: move the type or rule it needs into a model.py or "
-                "rules.py, or have the caller pass the value in"
+                f"{source.file}:{line}  import of impure {imported}  the file is pure and imports "
+                "only pure project files: move the type or rule it needs into a pure file, or "
+                f"have the caller pass the value in; {IMPURE_HINT}"
             )
     return out
+
+
+def section_line(text: str, header: str) -> int:
+    lines = text.splitlines()
+    return next((i + 1 for i, s in enumerate(lines) if s.strip() == header), 1)
+
+
+def load_impure() -> tuple[list[str], list[str]]:
+    """The `impure` patterns under `[tool.layout]`, and a failure when they are malformed."""
+    text = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    impure = tomllib.loads(text).get("tool", {}).get("layout", {}).get("impure", [])
+    if isinstance(impure, list) and all(isinstance(p, str) for p in impure):
+        return impure, []
+    failure = (
+        f"pyproject.toml:{section_line(text, '[tool.layout]')}  impure under [tool.layout] is "
+        f"{impure!r}, not a list of strings  write it as a list of glob patterns, "
+        'e.g. impure = ["*_io.py", "server.py"]'
+    )
+    return [], [failure]
 
 
 def load_declared() -> tuple[dict[str, list[str]], int]:
     text = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
     declared = tomllib.loads(text).get("tool", {}).get("layout", {}).get("imports", {})
-    lines = text.splitlines()
-    line = next((i + 1 for i, s in enumerate(lines) if s.strip() == "[tool.layout.imports]"), 1)
-    return {k: list(v) for k, v in declared.items()}, line
+    return {k: list(v) for k, v in declared.items()}, section_line(text, "[tool.layout.imports]")
 
 
 def cycle(declared: dict[str, list[str]]) -> list[str] | None:
@@ -277,8 +298,11 @@ def feature_failures(sources: list[Source], modules: set[str]) -> list[str]:
 def main() -> int:
     sources = read_sources()
     modules = {s.module for s in sources}
-    pure_modules = {s.module for s in sources if s.pure}
-    failures = [f for s in sources if s.pure for f in purity_failures(s, pure_modules, modules)]
+    impure, failures = load_impure()
+    if not failures:
+        pure = [s for s in sources if s.pure(impure)]
+        pure_modules = {s.module for s in pure}
+        failures += [f for s in pure for f in purity_failures(s, pure_modules, modules)]
     failures += feature_failures(sources, modules)
     for failure in failures:
         print(failure)
