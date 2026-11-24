@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Relay</title>
+<style>
+/* Defaults for an ordinary browser. Inside T3 Code the theme's own variables win. */
+:root{--d-bg:#ffffff;--d-fg:#18181b;--d-muted:#71717a;--d-card:#fafafa;--d-border:#e4e4e7;--d-primary:#2563eb;--d-on-primary:#ffffff;--d-secondary:#f4f4f5;--d-success:#16a34a;--d-warning:#d97706;--d-danger:#dc2626;--d-info:#2563eb;--d-warn-surface:#fffbeb}
+@media (prefers-color-scheme:dark){:root{--d-bg:#0b0b0d;--d-fg:#f4f4f5;--d-muted:#a1a1aa;--d-card:#151518;--d-border:#2a2a30;--d-primary:#4f7cff;--d-on-primary:#ffffff;--d-secondary:#1d1d22;--d-success:#34d399;--d-warning:#fbbf24;--d-danger:#f87171;--d-info:#60a5fa;--d-warn-surface:#2a2110}}
+*{box-sizing:border-box}
+.wrap{--bg:var(--background,var(--d-bg));--fg:var(--foreground,var(--d-fg));--muted:var(--muted-foreground,var(--d-muted));--panel:var(--card,var(--d-card));--line:var(--border,var(--d-border));--accent:var(--primary,var(--d-primary));--on-accent:var(--primary-foreground,var(--d-on-primary));--soft:var(--secondary,var(--d-secondary));--ok:var(--success,var(--d-success));--warn:var(--warning,var(--d-warning));--bad:var(--destructive,var(--d-danger));--live:var(--info,var(--d-info));--warn-bg:var(--warning-surface,var(--d-warn-surface));--round:var(--radius,8px);
+  display:flex;flex-direction:column;gap:16px;font-size:14px;line-height:1.45;color:var(--fg);font-family:var(--font-sans,system-ui,sans-serif)}
+body.browser{margin:0;padding:24px 16px;background:var(--d-bg)}
+body.browser .wrap{max-width:860px;margin:0 auto}
+h2{font-size:16px;margin:0}
+h3{font-size:12px;margin:0 0 10px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600}
+.row{display:flex;gap:8px 12px;flex-wrap:wrap;align-items:center}
+.muted{color:var(--muted)}.small{font-size:12px}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600;border:1px solid var(--line);white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--c)}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:var(--round);padding:16px}
+.ask{background:var(--warn-bg);border-color:var(--warn)}
+form{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-top:12px}
+.f{display:flex;flex-direction:column;gap:4px;min-width:0;border:0;margin:0;padding:0}
+.wide{grid-column:1/-1}
+label,legend{font-weight:600;padding:0}
+input[type=text],input[type=password]{font:inherit;width:100%;padding:8px 10px;border-radius:var(--round);border:1px solid var(--line);background:var(--bg);color:var(--fg)}
+[aria-invalid=true]{border-color:var(--bad)!important}
+.err{color:var(--bad);font-size:12px}
+.seg{display:flex;border:1px solid var(--line);border-radius:var(--round);overflow:hidden;background:var(--bg)}
+.seg.stack{flex-direction:column}
+.seg label{flex:1;font-weight:400;text-align:center;cursor:pointer}
+.seg.stack label{text-align:left}
+.seg input{position:absolute;opacity:0}
+.seg span{display:block;padding:8px 10px}
+.seg input:checked+span{background:var(--accent);color:var(--on-accent);font-weight:600}
+button{font:inherit;cursor:pointer;color:inherit}
+.btn{font-weight:600;padding:8px 16px;border-radius:var(--round);border:1px solid var(--line);background:var(--accent);color:var(--on-accent)}
+:focus-visible,.seg input:focus-visible+span{outline:2px solid var(--ring,var(--d-primary));outline-offset:2px}
+pre{margin:8px 0;font-family:var(--font-mono,monospace);font-size:12px;white-space:pre-wrap;word-break:break-word}
+/* The pipeline: connected stages that light up while in progress and turn green when done. */
+.pipe{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:0}
+.stage{position:relative;background:none;border:0;padding:6px 4px 8px;text-align:center;border-radius:var(--round)}
+.stage[aria-pressed=true]{background:var(--soft)}
+.stage::before{content:"";position:absolute;top:19px;left:calc(-50% + 18px);right:calc(50% + 18px);height:3px;border-radius:2px;background:var(--link)}
+.stage:first-child::before{display:none}
+.node{position:relative;display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;border:3px solid var(--c);color:var(--c);font-weight:700;font-size:13px;background:var(--bg)}
+.stage.done .node{background:var(--c);color:var(--bg)}
+.stage.active .node{box-shadow:0 0 0 4px color-mix(in srgb,var(--c) 28%,transparent)}
+.stage b{display:block;margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+li{display:flex;gap:8px}
+.g{width:16px;flex:none;text-align:center;color:var(--c);font-weight:700}
+@media (prefers-reduced-motion:no-preference){.stage.active .node{animation:pulse 2s ease-in-out infinite}}
+@keyframes pulse{50%{box-shadow:0 0 0 7px color-mix(in srgb,var(--c) 10%,transparent)}}
+</style>
+</head>
+<body>
+<div class="wrap" id="wrap">
+  <div id="head"></div><div id="ask" hidden></div><div id="body"></div>
+</div>
+<script>
+// The daemon replaces the placeholder with {state, base, token, schema, pinned}.
+const BOOT = /*BOOT*/null;
+let state = BOOT.state, live = false, picked = null, formKey = null, es = null, gone = false;
+let delivered = false, draftTimer = null;
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const url = (path, extra = "") => `${BOOT.base}${path}?thread=${encodeURIComponent(state.thread)}&t=${BOOT.token}${extra}`;
+const send = (path, body) => fetch(url(path), { method: "POST", body: JSON.stringify(body) });  // plain text: no preflight
+const STATUS = { running: ["Running", "var(--live)"], needs_input: ["Needs input", "var(--warn)"],
+                 blocked: ["Blocked", "var(--bad)"], done: ["Done", "var(--ok)"] };
+const INK = { done: "var(--ok)", active: "var(--live)", pending: "var(--muted)", failed: "var(--bad)" };
+const GLYPH = { done: "✓", active: "◐", pending: "○", failed: "✕" };
+const WORD = { done: "Done", active: "In progress", pending: "Not started", failed: "Failed" };
+if (BOOT.pinned) document.body.classList.add("browser");
+
+function stageState(stage) {
+  const all = stage.tasks, n = k => all.filter(t => t.status === k).length;
+  if (n("done") === all.length) return "done";
+  return n("active") || n("done") || n("failed") ? "active" : "pending";
+}
+
+function render() {
+  if (gone) return;
+  const tasks = state.stages.flatMap(s => s.tasks), done = tasks.filter(t => t.status === "done").length;
+  const [label, colour] = STATUS[state.status] ?? [state.status, "var(--muted)"];
+  const title = state.title || state.folder || "Thread";
+  document.title = `${title} · Relay`;
+  $("head").innerHTML = `<div class="row"><h2>${esc(title)}</h2>
+      <span class="pill" style="--c:${colour}"><span class="dot"></span>${label}</span>
+      ${state.failed ? `<span class="pill" style="--c:var(--bad)"><span class="dot"></span>${state.failed} failed</span>` : ""}
+      ${live ? "" : `<span class="pill" style="--c:var(--muted)"><span class="dot"></span>Not connected</span>`}</div>
+    <div class="muted small" style="margin-top:4px">${state.blocked ? `Blocked: ${esc(state.blocked)} · ` : ""}${
+      tasks.length ? `${done} of ${tasks.length} tasks done` : "No tasks yet"}${
+      state.updated ? ` · updated ${esc(new Date(state.updated).toLocaleTimeString())}` : ""}</div>`;
+
+  // Only when the question or its state changes, so typing is never wiped by an update.
+  const key = state.form ? `${state.form.id}:${state.form.state}` : "";
+  if (key !== formKey) { formKey = key; renderAsk(); }
+
+  if (!state.stages.length) { $("body").innerHTML = state.form ? "" : `<div class="muted">No plan yet.</div>`; return; }
+  const auto = Math.max(0, state.stages.findIndex(s => stageState(s) !== "done"));
+  const open = Math.min(picked ?? auto, state.stages.length - 1), current = state.stages[open];
+  const pipe = state.stages.length < 2 ? "" : `<div class="pipe" role="group" aria-label="Stages">${state.stages.map((s, i) => {
+    const st = stageState(s), failed = s.tasks.some(t => t.status === "failed");
+    const c = failed ? "var(--warn)" : st === "done" ? "var(--ok)" : st === "active" ? "var(--live)" : "var(--line)";
+    const link = i && stageState(state.stages[i - 1]) === "done" ? "var(--ok)" : "var(--line)";
+    return `<button class="stage ${st}" style="--c:${c};--link:${link}" aria-pressed="${i === open}" data-i="${i}">
+      <span class="node">${st === "done" ? "✓" : i + 1}</span><b>${esc(s.title)}</b>
+      <span class="muted small">${failed ? "Has a failure" : WORD[st]} · ${s.tasks.filter(t => t.status === "done").length}/${s.tasks.length}</span></button>`;
+  }).join("")}</div>`;
+  $("body").innerHTML = `${pipe}<div class="box" style="margin-top:${pipe ? 16 : 0}px"><h3>${esc(current.title)}</h3><ul>${
+    current.tasks.map(t => `<li><span class="g" style="--c:${INK[t.status]}" title="${WORD[t.status]}">${GLYPH[t.status]}</span><span>${esc(t.title)}${
+      t.note ? `<div class="muted small">${esc(t.note)}</div>` : ""}</span></li>`).join("")}</ul></div>`;
+  document.querySelectorAll(".stage").forEach(b => b.onclick = () => { picked = +b.dataset.i; render(); });
+}
+
+function renderAsk() {
+  const form = state.form, box = $("ask");
+  if (!form || form.state === "collected") {
+    box.hidden = !delivered; box.className = "box";
+    box.innerHTML = delivered ? "<b>✓ Delivered to the agent.</b>" : "";
+    if (delivered) setTimeout(() => { delivered = false; box.hidden = true; }, 6000);
+    return;
+  }
+  box.hidden = false;
+  if (form.state === "answered") {
+    box.className = "box";
+    box.innerHTML = form.delivered ? "<b>✓ Delivered to the agent.</b>"
+      : `<b>✓ Saved.</b> No agent is waiting, so tell the thread to continue.`;
+    return;
+  }
+  box.className = "box ask";
+  box.innerHTML = `<b>Waiting for you: ${esc(form.title)}</b><form novalidate>${form.fields.map(f => {
+    const id = "f_" + f.name, value = form.draft[f.name] ?? f.default, help = f.help ? `<span class="muted small">${esc(f.help)}</span>` : "";
+    if (f.type === "choice") {
+      const stack = f.options.length > 4 || f.options.join("").length > 28;
+      return `<fieldset class="f"><legend>${esc(f.label)}</legend><div class="seg ${stack ? "stack" : ""}">${f.options.map(o =>
+        `<label><input type="radio" name="${esc(f.name)}" value="${esc(o)}" ${o === value ? "checked" : ""}><span>${esc(o)}</span></label>`).join("")}</div>${help}</fieldset>`;
+    }
+    return `<div class="f"><label for="${id}">${esc(f.label)}${f.required ? "" : ` <span class="muted small">(optional)</span>`}</label>
+      <input id="${id}" name="${esc(f.name)}" type="${f.type === "password" ? "password" : "text"}" ${f.type === "number" ? `inputmode="decimal"` : ""}
+        value="${esc(value)}" autocomplete="off">${help}<span class="err" role="alert"></span></div>`; }).join("")}
+    <div class="row wide"><button class="btn" type="submit">Send to agent</button><span class="small" id="msg"></span></div></form>`;
+  const el = box.querySelector("form");
+  el.onsubmit = submit;
+  // Save what is typed, because T3 Code reloads this page when the user leaves the thread and returns.
+  el.oninput = () => { clearTimeout(draftTimer); draftTimer = setTimeout(() => send("/draft", { id: form.id, values: read(el, form) }).catch(() => {}), 500); };
+}
+
+const read = (el, form) => Object.fromEntries(form.fields.map(f => [f.name, String(new FormData(el).get(f.name) ?? "").trim()]));
+
+async function submit(e) {
+  e.preventDefault();
+  const form = state.form, values = read(e.target, form);
+  let bad = false;
+  for (const f of form.fields) {
+    const v = values[f.name], input = e.target.querySelector(`#f_${CSS.escape(f.name)}`);
+    const why = !v ? (f.required ? "Required." : "") : f.type === "number" && !/^-?\d+(\.\d+)?$/.test(v) ? "Enter a number." : "";
+    if (input) { input.setAttribute("aria-invalid", !!why); input.parentElement.querySelector(".err").textContent = why; }
+    bad ||= !!why;
+  }
+  if (bad) return;
+  clearTimeout(draftTimer);
+  try {
+    const reply = await send("/answer", { id: form.id, values });
+    if (!reply.ok) { $("msg").textContent = await reply.json(); return; }
+    delivered = true; state = await reply.json(); render();
+  } catch {
+    // The daemon cannot be reached: offer the answer as text for the chat.
+    $("msg").innerHTML = `Relay is not running. Paste this into the thread instead:<pre>${esc(JSON.stringify({ form: form.id, values }))}</pre>`;
+  }
+}
+
+function connect() {
+  if (es || gone) return;
+  es = new EventSource(url("/events"));
+  es.onopen = () => { live = true; render(); };
+  es.onerror = () => { live = false; render(); };  // EventSource retries by itself
+  es.onmessage = e => {
+    const next = JSON.parse(e.data);
+    if (next.schema !== BOOT.schema) return retire("This page is out of date. Ask the agent to render it again.");
+    // A newer page exists for this thread: shrink to one line and free the connection.
+    if (!BOOT.pinned && next.view > BOOT.state.view) return retire(`Replaced by a newer view of ${esc(next.title || next.folder || "this thread")} further down.`);
+    state = next; render();
+  };
+}
+function disconnect() { if (es) { es.close(); es = null; live = false; } }
+function retire(text) { gone = true; disconnect(); $("wrap").innerHTML = `<span class="muted small">${text}</span>`; }
+
+render();
+// Hold a connection only while on screen: a browser allows about six per host across all pages.
+if (BOOT.pinned || !("IntersectionObserver" in window)) connect();
+else new IntersectionObserver(entries => entries.at(-1).isIntersecting ? connect() : disconnect()).observe($("wrap"));
+</script>
+</body>
+</html>

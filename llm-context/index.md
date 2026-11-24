@@ -1,6 +1,6 @@
 ---
 type: index
-updated: 2026-11-17
+updated: 2026-11-24
 ---
 
 # LLM context
@@ -20,6 +20,8 @@ Knowledge written for agents to apply.
 
 - `python-style/`: a skill folder for writing good Python. Copy the whole folder into
   `.claude/skills/`. Holds the style guidelines, layout rules and the lint scripts.
+- `relay/`: a skill folder for live status pages and input forms in T3 Code threads. Holds the skill
+  and the source of the `relay` command it needs; `setup.md` has the install steps.
 - [[writing-skills]]: writing good, token-efficient skills.
 
 ## Writing styles
